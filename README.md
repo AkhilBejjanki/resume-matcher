@@ -152,18 +152,4 @@ Parse a single JD text. Returns skills, experience, salary, summary.
 | Required vs Optional split | Section header detection (Required / Desired / Good to have) |
 | Matching score | `(matched JD skills / total JD skills) × 100` |
 
----
 
-## Evaluation Checklist
-
-- [x] Salary extraction from resume and JD
-- [x] Experience extraction (explicit, degree-based, fresher)
-- [x] Skills extraction using rule-based dictionary
-- [x] Required vs Optional skills split
-- [x] JD summary / About Role extraction
-- [x] Skill mapping with `presentInResume` flag
-- [x] Matching score (0–100)
-- [x] Output JSON matches assignment specification
-- [x] REST API with Swagger docs
-- [x] Web UI
-- [x] Clean modular code structure

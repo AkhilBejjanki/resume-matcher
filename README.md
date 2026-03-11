@@ -14,8 +14,6 @@ A rule-based system that parses resumes (PDF) and matches them against job descr
 | Text Extraction | Regex (re) |
 | UI | Jinja2 + HTML/CSS/JS |
 
-> **Note:** Python was chosen over Node.js because all the allowed libraries in the assignment (`spaCy`, `NLTK`, `scikit-learn`, `pdfplumber`) are Python-native. All functional requirements are fully implemented.
-
 ---
 
 ## Project Structure

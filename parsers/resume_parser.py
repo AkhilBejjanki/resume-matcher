@@ -2,10 +2,6 @@ import re
 import pdfplumber
 from utils.skills_dict import SKILLS_LOWER_MAP
 
-# Load spaCy model for NER (used for name extraction)
-nlp = None  # spaCy disabled, using regex fallback
-
-
 # ─────────────────────────────────────────────
 # PDF TEXT EXTRACTION
 # ─────────────────────────────────────────────
@@ -27,23 +23,12 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 def extract_name(text: str) -> str:
     """
-    Extract candidate name using two strategies:
-    1. spaCy NER - look for PERSON entity near top of resume
-    2. Fallback - first clean line with 2-4 words
+    Extract candidate name — pure rule-based, no spaCy.
+    Scans top 6 lines for a clean 2-5 word capitalized name.
     """
     lines = [l.strip() for l in text.split("\n") if l.strip()]
-    top_text = "\n".join(lines[:10])  # Only scan top 10 lines
 
-    # Strategy 1: spaCy NER
-    if nlp:
-        doc = nlp(top_text)
-        for ent in doc.ents:
-            if ent.label_ == "PERSON" and len(ent.text.split()) >= 2:
-                return ent.text.strip()
-
-    # Strategy 2: Rule-based fallback
     for line in lines[:6]:
-        # Skip lines with emails, phones, URLs, digits at start
         if re.search(r"[@/\\|]", line):
             continue
         if re.match(r"^\d", line):
@@ -69,12 +54,15 @@ def extract_salary(text: str):
     Returns string like '12 LPA' or None.
     """
     patterns = [
-        # Indian format: 12 LPA, 10 Lakhs, ₹12,00,000
-        r"(?:expected|current|desired)?\s*(?:salary|ctc|package|compensation)[:\s]*(?:₹|rs\.?|inr)?\s*([\d,.]+\s*(?:lpa|lakh|lakhs|l|k)?(?:\s*per\s*annum|\s*pa)?)",
-        r"(?:₹|rs\.?|inr)\s*([\d,.]+\s*(?:lpa|lakh|lakhs|l|k)?)",
-        r"([\d,.]+\s*lpa)",
-        # US format: $80,000
-        r"\$([\d,]+(?:\.\d+)?)\s*(?:/\s*(?:yr|year|annum))?",
+        # Must have salary/ctc keyword + ₹ or number
+        r"(?:expected|current|desired|salary|ctc|package|compensation)[:\s]*₹\s*[\d,.]+",
+        r"(?:expected|current|desired|salary|ctc|package|compensation)[:\s]*[\d,.]+\s*(?:lpa|lakhs?|per\s*annum)",
+        # ₹ symbol directly (not inside a word)
+        r"(?<![a-zA-Z])₹\s*[\d,.]+(?:\s*(?:lpa|lakhs?|per\s*annum|pa))?",
+        # Standalone LPA (e.g. "12 LPA") — must have number right before
+        r"\b\d+(?:\.\d+)?\s*lpa\b",
+        # US dollar
+        r"\$[\d,]+(?:\.\d+)?(?:\s*[-–]\s*\$[\d,]+)?(?:\s*(?:per\s*year|\/year|annually))?",
     ]
 
     for pattern in patterns:
@@ -109,7 +97,14 @@ def extract_experience(text: str):
             return float(match.group(1))
 
     # Strategy 2: Calculate from date ranges
-    # Matches: "Jan 2020 – Mar 2022", "2020 - Present", "June 2019 to Dec 2021"
+    # Only count WORK experience — skip education section
+    # Split text at education section and only scan above it
+    edu_split = re.split(
+        r"\n\s*(?:education|academic|qualification|degree|university|college|institute|b\.?tech|bachelor)[^\n]*\n",
+        text, maxsplit=1, flags=re.IGNORECASE
+    )
+    work_text = edu_split[0] if len(edu_split) > 1 else text
+
     date_pattern = re.compile(
         r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?[a-z]*\.?\s*(\d{4})"
         r"\s*[-–—to]+\s*"
@@ -117,17 +112,17 @@ def extract_experience(text: str):
         re.IGNORECASE,
     )
 
-    current_year = 2025
+    current_year = 2026
     ranges = []
-    for match in date_pattern.finditer(text):
+    for match in date_pattern.finditer(work_text):
         start = int(match.group(1))
         end_raw = match.group(2)
         end = current_year if re.match(r"present|current|now", end_raw, re.I) else int(end_raw)
-        if 1990 <= start <= current_year and end >= start:
+        # Only count realistic work experience years (not ancient or future)
+        if 2010 <= start <= current_year and end >= start and (end - start) <= 15:
             ranges.append((start, end))
 
     if ranges:
-        # Merge overlapping ranges to avoid double-counting
         ranges.sort()
         merged = [list(ranges[0])]
         for start, end in ranges[1:]:
@@ -136,7 +131,8 @@ def extract_experience(text: str):
             else:
                 merged.append([start, end])
         total_years = sum(e - s for s, e in merged)
-        return round(float(total_years), 1)
+        if total_years > 0:
+            return round(float(total_years), 1)
 
     # Strategy 3: Fresher detection
     if re.search(r"\b(fresher|entry.?level|no\s+experience|0\s+years?)\b", text, re.IGNORECASE):

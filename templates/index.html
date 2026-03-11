@@ -146,7 +146,7 @@
 
     <!-- Output JSON -->
     <div class="card">
-      <div class="card-title">📦 Output JSON</div>
+      <div class="card-title">📦 Output JSON </div>
       <div style="display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="copyJSON()">📋 Copy</button>
         <button class="btn btn-outline" onclick="downloadJSON()">⬇ Download</button>
@@ -339,8 +339,25 @@
   }
 
   function copyJSON() {
-    navigator.clipboard.writeText(document.getElementById("jsonOutput").textContent)
-      .then(() => alert("JSON copied to clipboard!"));
+    const text = document.getElementById("jsonOutput").textContent;
+    // fallback for non-https environments
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => alert("JSON copied to clipboard!"));
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        alert("JSON copied to clipboard!");
+      }
+    } catch (e) {
+      alert("Copy failed — please use the Download button instead.");
+    }
   }
   function downloadJSON() {
     const blob = new Blob([document.getElementById("jsonOutput").textContent], { type: "application/json" });

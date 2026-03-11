@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resume Matcher — Rule-Based</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+    header {
+      background: #1e293b; border-bottom: 1px solid #334155;
+      padding: 16px 40px; display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    header h1 { font-size: 1.25rem; color: #f8fafc; display: flex; align-items: center; gap: 10px; }
+    .badge { font-size: 0.72rem; background: #0ea5e9; color: #fff; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .badge.g { background: #16a34a; }
+
+    .container { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 22px; }
+    .card-title { font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 18px; }
+
+    label { display: block; font-size: 0.82rem; color: #94a3b8; margin-bottom: 5px; margin-top: 14px; }
+    input[type="file"] { width: 100%; padding: 12px; background: #0f172a; border: 1px dashed #475569; border-radius: 8px; color: #cbd5e1; cursor: pointer; font-size: 0.88rem; }
+    input[type="text"], textarea { width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f1f5f9; font-size: 0.88rem; font-family: inherit; resize: vertical; }
+    textarea { min-height: 130px; }
+    input[type="text"]:focus, textarea:focus { outline: none; border-color: #0ea5e9; }
+
+    .jd-entry { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-top: 14px; position: relative; }
+    .jd-num { font-size: 0.72rem; font-weight: 700; color: #0ea5e9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .remove-btn { position: absolute; top: 12px; right: 12px; background: #7f1d1d; border: none; color: #fca5a5; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
+    .remove-btn:hover { background: #991b1b; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-success   { background: #16a34a; color: #fff; }
+    .btn-outline   { background: transparent; border: 1px solid #334155; color: #94a3b8; font-size: 0.82rem; padding: 7px 14px; }
+    .btn-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+    hr { border: none; border-top: 1px solid #1e293b; margin: 18px 0; }
+
+    .error-msg { background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; padding: 12px 16px; border-radius: 8px; font-size: 0.84rem; margin-top: 14px; display: none; }
+    .loader { display: none; text-align: center; padding: 28px; color: #64748b; font-size: 0.9rem; }
+    .loader.active { display: block; }
+
+    #results { display: none; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stat-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 14px 16px; }
+    .stat-box .sl { font-size: 0.68rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .stat-box .sv { font-size: 1rem; color: #f1f5f9; font-weight: 700; word-break: break-word; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+    .tag { padding: 4px 11px; border-radius: 20px; font-size: 0.74rem; font-weight: 600; }
+    .tag-resume  { background: #1e3a5f; color: #93c5fd; border: 1px solid #1d4ed8; }
+    .tag-present { background: #052e16; color: #6ee7b7; border: 1px solid #065f46; }
+    .tag-missing { background: #1e293b; color: #64748b; border: 1px solid #334155; }
+
+    .sec-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 7px; }
+
+    .job-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 20px; margin-top: 16px; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+    .job-title { font-size: 1rem; font-weight: 700; color: #f1f5f9; }
+    .job-meta { font-size: 0.77rem; color: #64748b; margin-top: 3px; line-height: 1.6; }
+    .job-about { font-size: 0.83rem; color: #94a3b8; margin: 12px 0; line-height: 1.55; }
+
+    .score-badge { padding: 7px 18px; border-radius: 20px; font-weight: 800; font-size: 1rem; white-space: nowrap; min-width: 68px; text-align: center; }
+    .score-high { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .score-mid  { background: #431407; color: #fb923c; border: 1px solid #9a3412; }
+    .score-low  { background: #1e1b4b; color: #818cf8; border: 1px solid #3730a3; }
+
+    .bar-wrap { margin: 12px 0 5px; }
+    .bar-bg { background: #1e293b; border-radius: 10px; height: 7px; }
+    .bar-fill { height: 7px; border-radius: 10px; transition: width 0.6s ease; }
+    .bar-lbl { font-size: 0.72rem; color: #64748b; margin-top: 4px; }
+
+    .skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 7px; margin-top: 10px; }
+    .sa { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 0.79rem; font-weight: 500; }
+    .sa.present { background: #052e16; color: #6ee7b7; border: 1px solid #065f46; }
+    .sa.missing { background: #1e293b; color: #64748b; border: 1px solid #334155; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot.present { background: #22c55e; }
+    .dot.missing { background: #475569; }
+
+    details { margin-top: 14px; }
+    summary { cursor: pointer; font-size: 0.81rem; color: #0ea5e9; user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
+    summary:hover { color: #38bdf8; }
+    summary::before { content: "▶"; font-size: 0.6rem; display: inline-block; transition: transform 0.2s; }
+    details[open] summary::before { transform: rotate(90deg); }
+
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 0.73rem; color: #64748b; }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+
+    .json-box { background: #0a0f1e; border: 1px solid #334155; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.76rem; color: #a5f3fc; overflow-x: auto; max-height: 420px; overflow-y: auto; margin-top: 12px; white-space: pre; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📄 Resume Matcher <span class="badge">Rule-Based · No LLMs</span></h1>
+  <span class="badge g">FastAPI · pdfplumber · regex</span>
+</header>
+
+<div class="container">
+
+  <!-- INPUT -->
+  <div class="card">
+    <div class="card-title">📤 Upload Resume &amp; Job Descriptions</div>
+
+    <label>Resume PDF *</label>
+    <input type="file" id="resumeFile" accept=".pdf" />
+
+    <hr/>
+
+    <div class="card-title" style="margin-bottom:0">📋 Job Descriptions</div>
+    <div id="jdContainer"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="addJD()">＋ Add JD</button>
+      <button class="btn btn-success" onclick="submitMatch()">🔍 Match Resume</button>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="loader" id="loader">⏳ Parsing resume and matching against JDs...</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <!-- Candidate Summary -->
+    <div class="card">
+      <div class="card-title">👤 Candidate Summary</div>
+      <div class="stats-grid" id="resumeSummary"></div>
+      <div class="sec-label">Skills Extracted from Resume</div>
+      <div class="tags" id="resumeSkillsList"></div>
+    </div>
+
+    <!-- Job Matches -->
+    <div class="card">
+      <div class="card-title">💼 Job Match Results</div>
+      <div id="jobMatchesList"></div>
+    </div>
+
+    <!-- Output JSON -->
+    <div class="card">
+      <div class="card-title">📦 Output JSON</div>
+      <div style="display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="copyJSON()">📋 Copy</button>
+        <button class="btn btn-outline" onclick="downloadJSON()">⬇ Download</button>
+      </div>
+      <div class="json-box" id="jsonOutput"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let jdCount = 0;
+  let lastResult = null;
+
+  function addJD() {
+    jdCount++;
+    const container = document.getElementById("jdContainer");
+    const div = document.createElement("div");
+    div.className = "jd-entry";
+    div.id = `jd-${jdCount}`;
+    div.innerHTML = `
+      <div class="jd-num">Job Description #${jdCount}</div>
+      <button class="remove-btn" onclick="removeJD(${jdCount})">✕ Remove</button>
+      <label>Role / Title *</label>
+      <input type="text" id="jdRole-${jdCount}" placeholder="e.g. Backend Developer" />
+      <label>Full JD Text * (paste complete job description)</label>
+      <textarea id="jdText-${jdCount}" placeholder="Paste the full job description here..."></textarea>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeJD(id) {
+    const el = document.getElementById(`jd-${id}`);
+    if (el) el.remove();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("errorMsg");
+    el.textContent = msg; el.style.display = "block";
+  }
+  function clearError() { document.getElementById("errorMsg").style.display = "none"; }
+
+  async function submitMatch() {
+    clearError();
+    document.getElementById("results").style.display = "none";
+
+    const fileInput = document.getElementById("resumeFile");
+    if (!fileInput.files.length) { showError("Please upload a resume PDF."); return; }
+
+    const jds = [];
+    document.querySelectorAll(".jd-entry").forEach(entry => {
+      const id   = entry.id.split("-")[1];
+      const role = document.getElementById(`jdRole-${id}`)?.value?.trim();
+      const text = document.getElementById(`jdText-${id}`)?.value?.trim();
+      if (role && text) jds.push({ id: `JD00${id}`, role, text });
+    });
+
+    if (!jds.length) { showError("Please add at least one JD with role and text."); return; }
+
+    const loader = document.getElementById("loader");
+    loader.classList.add("active");
+
+    const formData = new FormData();
+    formData.append("resume", fileInput.files[0]);
+    formData.append("jds", JSON.stringify(jds));
+
+    try {
+      const res = await fetch("/api/match", { method: "POST", body: formData });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Server error"); }
+      const data = await res.json();
+      lastResult = data;
+      renderResults(data);
+    } catch (e) {
+      showError("Error: " + e.message);
+    } finally {
+      loader.classList.remove("active");
+    }
+  }
+
+  function renderResults(data) {
+
+    // ── Candidate Summary ──
+    document.getElementById("resumeSummary").innerHTML = `
+      <div class="stat-box"><div class="sl">Name</div><div class="sv">${data.name || "—"}</div></div>
+      <div class="stat-box"><div class="sl">Experience</div><div class="sv">${data.yearOfExperience != null ? data.yearOfExperience + " yrs" : "—"}</div></div>
+      <div class="stat-box"><div class="sl">Salary / CTC</div><div class="sv" style="font-size:0.85rem">${data.salary || "Not mentioned"}</div></div>
+      <div class="stat-box"><div class="sl">Skills Found</div><div class="sv">${data.resumeSkills.length}</div></div>
+      <div class="stat-box"><div class="sl">Jobs Analysed</div><div class="sv">${data.matchingJobs.length}</div></div>
+    `;
+
+    document.getElementById("resumeSkillsList").innerHTML = data.resumeSkills.length
+      ? data.resumeSkills.map(s => `<span class="tag tag-resume">${s}</span>`).join("")
+      : `<span style="color:#64748b;font-size:0.83rem">No skills detected</span>`;
+
+    // ── Job Cards ──
+    const jobsEl = document.getElementById("jobMatchesList");
+    jobsEl.innerHTML = "";
+
+    if (!data.matchingJobs.length) {
+      jobsEl.innerHTML = `<p style="color:#64748b;font-size:0.9rem">No jobs to display.</p>`; 
+    }
+
+    data.matchingJobs.forEach(job => {
+      const score      = job.matchingScore;
+      const scoreClass = score >= 60 ? "score-high" : score >= 30 ? "score-mid" : "score-low";
+      const barColor   = score >= 60 ? "#22c55e"   : score >= 30 ? "#f97316"   : "#818cf8";
+      const matched    = job.skillsAnalysis.filter(s => s.presentInResume).length;
+      const total      = job.skillsAnalysis.length;
+
+      // Skill analysis grid
+      const saGrid = job.skillsAnalysis.map(s =>
+        `<div class="sa ${s.presentInResume ? "present" : "missing"}">
+          <div class="dot ${s.presentInResume ? "present" : "missing"}"></div>${s.skill}
+        </div>`
+      ).join("");
+
+      // Required skill tags (colour by presence in resume)
+      const reqTags = (job.requiredSkills || []).length
+        ? (job.requiredSkills).map(s => {
+            const hit = job.skillsAnalysis.find(x => x.skill === s);
+            return `<span class="tag ${hit?.presentInResume ? "tag-present" : "tag-missing"}">${s}</span>`;
+          }).join("")
+        : `<span style="color:#64748b;font-size:0.8rem">—</span>`;
+
+      // Optional skill tags
+      const optSection = (job.optionalSkills || []).length ? `
+        <div class="sec-label">Optional / Preferred Skills</div>
+        <div class="tags">${job.optionalSkills.map(s => {
+          const hit = job.skillsAnalysis.find(x => x.skill === s);
+          return `<span class="tag ${hit?.presentInResume ? "tag-present" : "tag-missing"}">${s}</span>`;
+        }).join("")}</div>` : "";
+
+      const div = document.createElement("div");
+      div.className = "job-card";
+      div.innerHTML = `
+        <div class="job-header">
+          <div>
+            <div class="job-title">${job.role}</div>
+            <div class="job-meta">
+              🆔 ${job.jobId}
+              ${job.salary ? ` &nbsp;·&nbsp; 💰 ${job.salary}` : ""}
+              ${job.experienceRequired != null ? ` &nbsp;·&nbsp; 🕐 ${job.experienceRequired}+ yrs required` : ""}
+            </div>
+          </div>
+          <div class="score-badge ${scoreClass}">${score}%</div>
+        </div>
+
+        <div class="bar-wrap">
+          <div class="bar-bg"><div class="bar-fill" style="width:${score}%;background:${barColor}"></div></div>
+          <div class="bar-lbl">${matched} / ${total} JD skills matched</div>
+        </div>
+
+        <div class="job-about">${job.aboutRole}</div>
+
+        <div class="sec-label">Required Skills <small style="font-weight:400;text-transform:none;letter-spacing:0">(green = found in resume)</small></div>
+        <div class="tags">${reqTags}</div>
+
+        ${optSection}
+
+        <details>
+          <summary>Full Skill Analysis — all ${total} JD skills</summary>
+          <div class="skill-grid">${saGrid}</div>
+          <div class="legend">
+            <span><span style="color:#22c55e">●</span> Found in resume</span>
+            <span><span style="color:#475569">●</span> Not in resume</span>
+          </div>
+        </details>
+      `;
+      jobsEl.appendChild(div);
+    });
+
+    // ── JSON Output ──
+    const out = {
+      name: data.name,
+      salary: data.salary,
+      yearOfExperience: data.yearOfExperience,
+      resumeSkills: data.resumeSkills,
+      matchingJobs: data.matchingJobs.map(j => ({
+        jobId: j.jobId,
+        role: j.role,
+        aboutRole: j.aboutRole,
+        skillsAnalysis: j.skillsAnalysis,
+        matchingScore: j.matchingScore,
+      }))
+    };
+    document.getElementById("jsonOutput").textContent = JSON.stringify(out, null, 2);
+
+    document.getElementById("results").style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function copyJSON() {
+    navigator.clipboard.writeText(document.getElementById("jsonOutput").textContent)
+      .then(() => alert("JSON copied to clipboard!"));
+  }
+  function downloadJSON() {
+    const blob = new Blob([document.getElementById("jsonOutput").textContent], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "resume_match_output.json";
+    a.click();
+  }
+
+  // Auto-add first JD on load
+  addJD();
+</script>
+</body>
+</html>
